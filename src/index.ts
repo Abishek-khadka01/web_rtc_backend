@@ -4,13 +4,13 @@ import express from "express";
 const app = express()
 import dotenv from "dotenv"
 import {Redis} from "ioredis"
-import  {ConnectToDatabase}  from "./utils/database";
+import  {ConnectToDatabase, prisma}  from "./utils/database.js";
 dotenv.config()
 import cors from "cors"
 import CookieParser from "cookie-parser"
+import { HandleAnswer, HandleOffer } from "./controllers/socket.js";
+import { SEND_OFFER , SEND_ANSWER } from "./constants/socket.contants.js";
 
-import { Socket } from "dgram";
-import { prisma } from "./utils/database";
 
 app.use(cors({
     origin:"http://localhost:5173",
@@ -67,8 +67,26 @@ const MapSocketIdTouser = new Map<string , string>()
 
 
 
-io.on("connection", (socket :SocketIO)=>{
+io.on("connection",async (socket :SocketIO)=>{
+    const user = socket.user;
     console.log(`User is connected , ${socket.id}`)
+
+    MapSocketIdTouser.set(socket.id , socket.user as string)
+    MapUserToSocket.set(user as string , socket.id)
+    await redisClient.lpush("onlineUsers",user as string)
+
+    socket.on(SEND_OFFER, async(socket : SocketIO)=>{
+       await  HandleOffer(socket)
+    })
+    socket.on("SEND_ANSWER", async(socket : SocketIO)=>{
+        await HandleAnswer(socket)
+     })
+
+    socket.on("disconnect", async ()=>{
+        MapSocketIdTouser.delete(socket.id)
+        MapUserToSocket.delete(user as string)
+        await redisClient.lrem("onlineUsers",0,user as string)
+    })
 
 
 })
@@ -104,7 +122,9 @@ httpServer.listen(PORT , ()=>{
 
 
 
-import { ErrorMiddleware } from "middleware/Error";
+import { ErrorMiddleware } from "./middleware/Error.js";
+
+
 
 
 app.use(ErrorMiddleware)

@@ -1,11 +1,11 @@
 
-import { redisClient } from "index";
-import { JwtTokenType, UserFnType } from "types/user.types";
-import { prisma } from "utils/database";
-import { SendMail } from "utils/nodemailer";
-import { CreateOneTimeToken } from "utils/tokens";
-import { UserRegisterValidator } from "validators/user.validators";
-import { HashPassword } from "utils/hash";
+import { redisClient } from "index.js";
+import { JwtTokenType, UserFnType } from "types/user.types.js";
+import { prisma } from "utils/database.js";
+import { SendMail } from "utils/nodemailer.js";
+import { CreateOneTimeToken, CreateTokens } from "utils/tokens.js";
+import { UserLoginValidator, UserRegisterValidator } from "validators/user.validators.js";
+import { ComparePassword, HashPassword } from "utils/hash.js";
 import jwt from "jsonwebtoken"
  export const GetOnlineUsers : UserFnType=async  (req , res )=>{
 
@@ -146,6 +146,114 @@ export const RegisterFromMail : UserFnType = async (req , res)=>{
             message :`Error in registering from the mail ${error}`  
         })
     }
+
+}
+
+export const UserLogin : UserFnType = async (req ,res)=>{
+
+
+    try {
+        const validate = UserLoginValidator.validate(req.body)
+        if(validate.error){
+
+            console.log(`Error in the validation ${validate.error.message}`)
+            return res.status(301).json({
+                success : false,
+                message : validate.error.message
+            })
+        }
+        const {email, password } = req.body;
+
+        const findUser = await prisma.users.findUnique({
+            where :{
+                email ,
+            }
+        })
+        if(!findUser){
+            console.log(`the user is not found `)
+            return res.status(401).json({
+                success : false,
+                message :"Invalid Credentials "
+            })
+        }
+
+
+        const isPasswordCorrect = await ComparePassword(password, findUser.password)
+        if(!isPasswordCorrect){
+            console.log(`Password is not correct `)
+            return res.status(401).json({
+                success :false,
+                message :"Invalid Credentials "
+            })
+        }
+        // create tokens 
+        const {accessToken, refreshToken } = CreateTokens(findUser.id)
+
+
+
+
+        return res.status(200).json({
+            success : true ,
+            message :"User logged in successfully",
+            tokens :{
+                accessToken, 
+                refreshToken
+            }
+        })
+        
+    } catch (error) {
+        console.log(`Error in the logging the user`)
+        return res.status(500).json({
+            success : false,
+            message :`Error in the logging the user ${error} `
+        })
+    }
+
+
+}
+
+export const UserLogOut  : UserFnType = async (req , res)=>{
+
+        try {
+            const {user} = req;
+            
+
+            if(!user){
+                console.log("User is not logged in")
+                return res.status(401).json({
+                    success :false,
+                    message :"User is not logged in"
+                })
+            }
+                const findUser = await prisma.users.findUnique({
+                    where :{
+                        id : user
+                    }
+                })
+                if(!findUser){
+                    console.log("User is not found")
+                    return res.status(404).json({
+                        success :false,
+                        message :"User is not found"
+                    })
+                }
+
+
+            await redisClient.del("onlineUsers", user)
+                req.user = null
+
+
+            return res.status(200).json({
+                success : false,
+                message :"User logged out successfully"
+            })
+        } catch (error) {
+            console.log(`Error in logging out the user ${error}`)
+            return res.status(500).json({
+                success :false,
+                message :"Error in logging out the user"
+            })
+        }
 
 }
 

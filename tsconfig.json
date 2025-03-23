@@ -1,6 +1,6 @@
 {
   "compilerOptions": {
-    "module": "CommonJS",            // Use CommonJS module system
+               
     "moduleResolution": "node",      // Use Node.js module resolution
     "target": "ESNext",              // Modern JavaScript target
     "esModuleInterop": true,         // Ensure compatibility with CommonJS
