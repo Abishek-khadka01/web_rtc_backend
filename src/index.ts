@@ -93,7 +93,7 @@ io.on("connection",async (socket :SocketIO)=>{
 
 const redisClient = new Redis({
     host:"localhost",
-    port:6379,
+    port:6380,
 })
 io.on("connection", (socket) => {
   console.log("a user connected", socket.id);
@@ -123,6 +123,10 @@ httpServer.listen(PORT , ()=>{
 
 
 import { ErrorMiddleware } from "./middleware/Error.js";
+
+import { UserRouter } from "./routes/user.routes.js";
+
+app.use("/api/v1/users" , UserRouter)
 
 
 

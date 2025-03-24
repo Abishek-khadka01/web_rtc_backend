@@ -1,16 +1,17 @@
 
-import { redisClient } from "index.js";
-import { JwtTokenType, UserFnType } from "types/user.types.js";
-import { prisma } from "utils/database.js";
-import { SendMail } from "utils/nodemailer.js";
-import { CreateOneTimeToken, CreateTokens } from "utils/tokens.js";
-import { UserLoginValidator, UserRegisterValidator } from "validators/user.validators.js";
+import { redisClient } from "../index.js";
+import { JwtTokenType, UserFnType } from "../types/user.types.js";
+import { prisma } from "../utils/database.js";
+import { SendMail } from "../utils/nodemailer.js";
+import { CreateOneTimeToken, CreateTokens } from "../utils/tokens.js";
+import { UserLoginValidator, UserRegisterValidator } from "../validators/user.validators.js";
 import { ComparePassword, HashPassword } from "utils/hash.js";
 import jwt from "jsonwebtoken"
  export const GetOnlineUsers : UserFnType=async  (req , res )=>{
 
 
     try {
+        const {user} = req;
         const GetData = await redisClient.lrange("onlineUsers", 0 , -1);
 
         if(!GetData){
@@ -21,8 +22,13 @@ import jwt from "jsonwebtoken"
             })
         }
 
+            // get the data without including the user
 
-    const PromiseResponseData =   GetData.map((id)=>{
+            const Online = GetData.filter((id)=>{
+                return id !== user
+            })
+
+    const PromiseResponseData =   Online.map((id)=>{
                 return prisma.users.findUnique({
                     where :{
                         id
@@ -40,7 +46,9 @@ import jwt from "jsonwebtoken"
 return res.status(200).json({
     success : true,
     message : `Online users found`,
-    users : responseData
+    data:{
+        onlineUsers : PromiseResponseData
+    }
 })
 
 
@@ -71,7 +79,8 @@ export const UserRegister :UserFnType = async (req , res)=>{
 
 
             const {username , email , password} = req.body;
-        const hashedPassword = await HashPassword(password)
+        const hashedPassword = password
+        //  await HashPassword(password)
 
         const jwtToken = CreateOneTimeToken(email, username, hashedPassword)
 
@@ -150,7 +159,7 @@ export const RegisterFromMail : UserFnType = async (req , res)=>{
 }
 
 export const UserLogin : UserFnType = async (req ,res)=>{
-
+    console.log(`User Login Api is running `)
 
     try {
         const validate = UserLoginValidator.validate(req.body)
@@ -167,7 +176,8 @@ export const UserLogin : UserFnType = async (req ,res)=>{
         const findUser = await prisma.users.findUnique({
             where :{
                 email ,
-            }
+            },
+            
         })
         if(!findUser){
             console.log(`the user is not found `)
@@ -178,7 +188,9 @@ export const UserLogin : UserFnType = async (req ,res)=>{
         }
 
 
-        const isPasswordCorrect = await ComparePassword(password, findUser.password)
+        const isPasswordCorrect = password===findUser.password 
+        
+        // await ComparePassword(password, findUser.password)
         if(!isPasswordCorrect){
             console.log(`Password is not correct `)
             return res.status(401).json({
@@ -190,15 +202,27 @@ export const UserLogin : UserFnType = async (req ,res)=>{
         const {accessToken, refreshToken } = CreateTokens(findUser.id)
 
 
+            res.cookie("accessToken" , accessToken, {
+                httpOnly : true,
+                secure : true,
+                sameSite : "none",
+                maxAge: 1000 * 60 * 60
+            }).cookie("refreshToken" , refreshToken, {
+                httpOnly : true,
+                secure : true,
+                sameSite : "none",
+                maxAge: 1000 * 60 * 60* 24*15
+            })
 
-
+            console.log(`User Logged in Successfully`)
         return res.status(200).json({
             success : true ,
             message :"User logged in successfully",
             tokens :{
                 accessToken, 
                 refreshToken
-            }
+            },
+            user : findUser,
         })
         
     } catch (error) {
@@ -257,3 +281,54 @@ export const UserLogOut  : UserFnType = async (req , res)=>{
 
 }
 
+export const GetUserbyId  : UserFnType = async (req , res)=>{
+
+    try {
+
+        const {user} = req;
+        if(!user){
+            console.log(`The user is not logged in properly `)
+            return res.status(401).json({
+                success :false,
+                message :"User is not authenticated "
+            })
+        }
+
+            const id  = req.query.id as string;
+        const findUser = await prisma.users.findUnique({
+            where :{
+                id ,
+            }, select :{
+                id : true,
+                username : true,
+                email : true,
+                profile_picture: true
+            }
+        })
+        if(!findUser){
+            console.log(`The user is not found `)
+            return res.status(404).json({
+                success :false,
+                message :"User is not found"
+            })
+        }
+
+
+
+        return res.status(200).json({
+            success :true,
+            message :"User found successfully",
+            
+        })
+    } catch (error) {
+        console.log(`Error in getting the details of the user`)
+        return res.status(500).json({
+            success : false,
+            message :`Internal Server Errorn ${error}`
+        })
+    }
+
+
+
+
+}
