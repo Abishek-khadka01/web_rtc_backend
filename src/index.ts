@@ -36,11 +36,11 @@ const io = new Server(httpServer, {
 io.use( async (socket : SocketIO, next)=>{
 
     try {
-        const user = socket.handshake.auth.user // it is the uuid of the user
+        const user = socket.handshake.query.user as string  // it is the uuid of the user
 
         const findUser = await prisma.users.findUnique({
             where : {
-                id: user
+                id: user 
             }
         })
 
@@ -73,7 +73,13 @@ io.on("connection",async (socket :SocketIO)=>{
 
     MapSocketIdTouser.set(socket.id , socket.user as string)
     MapUserToSocket.set(user as string , socket.id)
-    await redisClient.lpush("onlineUsers",user as string)
+ 
+
+    const onlineUsers = await redisClient.lrange("onlineUsers", 0, -1);
+    if (!onlineUsers.includes(user as string)) {
+      await redisClient.lpush("onlineUsers", user as string);
+      console.log(`User ${user} added to online users.`);
+    }
 
     socket.on(SEND_OFFER, async(socket : SocketIO)=>{
        await  HandleOffer(socket)

@@ -1,6 +1,6 @@
 import { JWTUserType } from "../types/user.types.js";
 
-import { CreateAccessToken } from "utils/tokens.js";
+import { CreateAccessToken } from "../utils/tokens.js";
 import jwt, { JwtPayload } from "jsonwebtoken";
 import { Request, Response, NextFunction } from "express";
 
@@ -70,6 +70,7 @@ export const AuthMiddleware = async (req: Request, res: Response, next: NextFunc
 
       
         // Recreate access token
+        console.log(`Recreating the accesstoken from the refresh token `)
         const { accessToken : newAccessToken, id } = await CreateAccessToken(refreshToken as string );
 
         res.cookie("accessToken", newAccessToken, {

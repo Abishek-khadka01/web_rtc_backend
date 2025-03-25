@@ -5,7 +5,7 @@ import { prisma } from "../utils/database.js";
 
 export const HandleOffer = async (socket : SocketIO )=>{
 
-    const { from , to, offer} = socket.data
+    const { from , to, offer , url } = socket.data
     
     const toSocketid = MapUserToSocket.get(to);
    
@@ -25,7 +25,8 @@ export const HandleOffer = async (socket : SocketIO )=>{
     if(toSocketid){
         socket.to(toSocketid).emit(RECEIVE_OFFER , {
             offer,
-            sender : Sender
+            sender : Sender,
+            url 
             
         })
     }

@@ -11,16 +11,12 @@ import jwt from "jsonwebtoken"
 
 
     try {
+
+        console.log(`Get Online Users Route is working `)
         const {user} = req;
         const GetData = await redisClient.lrange("onlineUsers", 0 , -1);
 
-        if(!GetData){
-            console.log("No online users")
-            return res.status(401).json({
-                success :false,
-                message :"No online users"
-            })
-        }
+    
 
             // get the data without including the user
 
@@ -28,6 +24,14 @@ import jwt from "jsonwebtoken"
                 return id !== user
             })
 
+
+                if(!Online.length){
+                    console.log(`No online users found`)
+                    return res.status(203).json({
+                        success : true,
+                        message :"No users found"
+                    })
+                }
     const PromiseResponseData =   Online.map((id)=>{
                 return prisma.users.findUnique({
                     where :{
@@ -43,12 +47,13 @@ import jwt from "jsonwebtoken"
 
         const responseData = await Promise.all(PromiseResponseData)
 
+        console.log(`Response data for the users is ${JSON.stringify(responseData)}`)
+
 return res.status(200).json({
     success : true,
     message : `Online users found`,
-    data:{
-        onlineUsers : PromiseResponseData
-    }
+     onlineUsers : responseData
+    
 })
 
 
@@ -294,7 +299,9 @@ export const GetUserbyId  : UserFnType = async (req , res)=>{
             })
         }
 
-            const id  = req.query.id as string;
+            const id  = req.params.id as string;
+
+            console.log(`Id of the users is ${id}` )
         const findUser = await prisma.users.findUnique({
             where :{
                 id ,
@@ -313,11 +320,12 @@ export const GetUserbyId  : UserFnType = async (req , res)=>{
             })
         }
 
-
+        console.log(`User is found successfully  ${JSON.stringify(findUser)}`)
 
         return res.status(200).json({
             success :true,
             message :"User found successfully",
+            userdata : findUser
             
         })
     } catch (error) {
